@@ -8,11 +8,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     
-    <!-- XTerm.js and addons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/xterm/3.14.5/xterm.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xterm/3.14.5/xterm.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.5.0/lib/xterm-addon-fit.min.js"></script>
-    
     <!-- Monaco Editor -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.js"></script>
     
@@ -28,32 +23,6 @@
             background-color: rgba(75, 85, 99, 0.5);
         }
         
-        .context-menu {
-            min-width: 160px;
-        }
-        
-        #terminal {
-            padding: 8px;
-            height: calc(100% - 40px);
-        }
-        
-        .xterm-viewport::-webkit-scrollbar {
-            width: 8px;
-        }
-        
-        .xterm-viewport::-webkit-scrollbar-track {
-            background: #1a1a1a;
-        }
-        
-        .xterm-viewport::-webkit-scrollbar-thumb {
-            background: #666;
-            border-radius: 4px;
-        }
-        
-        .xterm-viewport::-webkit-scrollbar-thumb:hover {
-            background: #888;
-        }
-        
         #editorContainer {
             min-height: 300px;
             height: 100%;
@@ -65,13 +34,38 @@
         }
 
         #terminalContainer {
-            height: 33vh;
-            min-height: 150px;
+            height: 200px;
             display: none;
+            background: #1e1e1e;
+            color: #fff;
+            font-family: 'Fira Code', monospace;
+            padding: 8px;
+            overflow-y: auto;
         }
 
         #terminalContainer.show {
             display: block;
+        }
+
+        #terminalOutput {
+            white-space: pre-wrap;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        #terminalInput {
+            background: transparent;
+            border: none;
+            color: #fff;
+            font-family: 'Fira Code', monospace;
+            font-size: 14px;
+            width: 100%;
+            outline: none;
+            padding: 4px 0;
+        }
+
+        .terminal-prompt {
+            color: #0f0;
         }
     </style>
 </head>
@@ -116,14 +110,18 @@
             <div id="editorContainer" class="flex-1"></div>
             
             <!-- Terminal Container -->
-            <div id="terminalContainer" class="bg-black">
-                <div class="bg-gray-800 p-2 flex justify-between items-center border-t border-gray-700">
+            <div id="terminalContainer" class="border-t border-gray-700">
+                <div class="bg-gray-800 p-2 flex justify-between items-center">
                     <span class="text-sm font-semibold">Terminal</span>
                     <button class="p-1 hover:bg-gray-700 rounded" id="closeTerminal">
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
-                <div id="terminal"></div>
+                <div id="terminalOutput"></div>
+                <div class="flex">
+                    <span class="terminal-prompt">$&nbsp;</span>
+                    <input type="text" id="terminalInput" autofocus>
+                </div>
             </div>
         </div>
     </main>
@@ -164,21 +162,25 @@
                     wordWrap: 'on'
                 });
 
-                // Initialize terminal
-                const term = new Terminal({
-                    cursorBlink: true,
-                    fontSize: 14,
-                    fontFamily: 'Fira Code, monospace',
-                    theme: {
-                        background: '#000000',
-                        foreground: '#ffffff'
+                // Terminal functionality
+                const terminalOutput = document.getElementById('terminalOutput');
+                const terminalInput = document.getElementById('terminalInput');
+                
+                function appendToTerminal(text) {
+                    terminalOutput.textContent += text + '\n';
+                    terminalOutput.scrollTop = terminalOutput.scrollHeight;
+                }
+
+                appendToTerminal('Welcome to Tablet Code Editor Terminal');
+
+                terminalInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        const command = this.value;
+                        appendToTerminal('$ ' + command);
+                        appendToTerminal('Command executed: ' + command);
+                        this.value = '';
                     }
                 });
-
-                const fitAddon = new FitAddon.FitAddon();
-                term.loadAddon(fitAddon);
-                term.open(document.getElementById('terminal'));
-                term.write('Welcome to Tablet Code Editor Terminal\r\n$ ');
 
                 // Terminal Toggle
                 const terminalBtn = document.getElementById('terminalBtn');
@@ -188,10 +190,8 @@
                 terminalBtn.addEventListener('click', () => {
                     terminalContainer.classList.toggle('show');
                     if (terminalContainer.classList.contains('show')) {
-                        setTimeout(() => {
-                            fitAddon.fit();
-                            editor.layout();
-                        }, 0);
+                        terminalInput.focus();
+                        editor.layout();
                     } else {
                         editor.layout();
                     }
@@ -213,24 +213,6 @@
                 // Handle window resize
                 window.addEventListener('resize', () => {
                     editor.layout();
-                    if (terminalContainer.classList.contains('show')) {
-                        fitAddon.fit();
-                    }
-                });
-
-                // Basic terminal input handling
-                term.onKey(({ key, domEvent }) => {
-                    const printable = !domEvent.altKey && !domEvent.ctrlKey && !domEvent.metaKey;
-
-                    if (domEvent.keyCode === 13) { // Enter
-                        term.write('\r\n$ ');
-                    } else if (domEvent.keyCode === 8) { // Backspace
-                        if (term._core.buffer.x > 2) {
-                            term.write('\b \b');
-                        }
-                    } else if (printable) {
-                        term.write(key);
-                    }
                 });
             });
         });
