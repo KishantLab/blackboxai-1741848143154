@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tablet Code Editor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    
+    <!-- XTerm.js and addons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/xterm/3.14.5/xterm.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xterm/3.14.5/xterm.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.5.0/lib/xterm-addon-fit.min.js"></script>
+    
+    <!-- Monaco Editor -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.js"></script>
+    
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+        
+        .file-item:hover {
+            background-color: rgba(75, 85, 99, 0.5);
+        }
+        
+        .context-menu {
+            min-width: 160px;
+        }
+        
+        #terminal {
+            padding: 8px;
+            height: calc(100% - 40px);
+        }
+        
+        .xterm-viewport::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .xterm-viewport::-webkit-scrollbar-track {
+            background: #1a1a1a;
+        }
+        
+        .xterm-viewport::-webkit-scrollbar-thumb {
+            background: #666;
+            border-radius: 4px;
+        }
+        
+        .xterm-viewport::-webkit-scrollbar-thumb:hover {
+            background: #888;
+        }
+        
+        #editorContainer {
+            min-height: 300px;
+            height: 100%;
+            width: 100%;
+        }
+
+        .monaco-editor {
+            padding-top: 5px;
+        }
+
+        #terminalContainer {
+            height: 33vh;
+            min-height: 150px;
+            display: none;
+        }
+
+        #terminalContainer.show {
+            display: block;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 h-screen flex flex-col">
+    <!-- Header/Toolbar -->
+    <header class="bg-gray-800 p-2 flex items-center justify-between border-b border-gray-700">
+        <div class="flex items-center space-x-4">
+            <button class="p-2 hover:bg-gray-700 rounded-lg" id="menuBtn">
+                <i class="fas fa-bars"></i>
+            </button>
+            <h1 class="text-xl font-semibold">Tablet Code Editor</h1>
+        </div>
+        <div class="flex items-center space-x-2">
+            <button class="p-2 hover:bg-gray-700 rounded-lg" id="terminalBtn">
+                <i class="fas fa-terminal"></i>
+            </button>
+            <button class="p-2 hover:bg-gray-700 rounded-lg" id="settingsBtn">
+                <i class="fas fa-cog"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex overflow-hidden">
+        <!-- Sidebar -->
+        <aside class="w-64 bg-gray-800 border-r border-gray-700 hidden md:block" id="sidebar">
+            <div class="p-4">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="font-semibold">Explorer</h2>
+                    <button class="p-1 hover:bg-gray-700 rounded">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
+                <div id="fileTree" class="text-sm">
+                    <!-- File tree will be populated dynamically -->
+                </div>
+            </div>
+        </aside>
+
+        <!-- Editor Container -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+            <div id="editorContainer" class="flex-1"></div>
+            
+            <!-- Terminal Container -->
+            <div id="terminalContainer" class="bg-black">
+                <div class="bg-gray-800 p-2 flex justify-between items-center border-t border-gray-700">
+                    <span class="text-sm font-semibold">Terminal</span>
+                    <button class="p-1 hover:bg-gray-700 rounded" id="closeTerminal">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div id="terminal"></div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Initialize Monaco Editor
+        require.config({
+            paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs' }
+        });
+
+        window.MonacoEnvironment = {
+            getWorkerUrl: function() {
+                return `data:text/javascript;charset=utf-8,${encodeURIComponent(`
+                    self.MonacoEnvironment = {
+                        baseUrl: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/'
+                    };
+                    importScripts('https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/base/worker/workerMain.js');`
+                )}`;
+            }
+        };
+
+        // Wait for DOM content to load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Load Monaco Editor
+            require(['vs/editor/editor.main'], function() {
+                // Create Monaco editor instance
+                window.editor = monaco.editor.create(document.getElementById('editorContainer'), {
+                    value: '// Welcome to Tablet Code Editor\n// Start coding here...',
+                    language: 'javascript',
+                    theme: 'vs-dark',
+                    minimap: { enabled: false },
+                    fontSize: 14,
+                    automaticLayout: true,
+                    scrollBeyondLastLine: false,
+                    padding: { top: 10 },
+                    lineNumbers: 'on',
+                    roundedSelection: false,
+                    wordWrap: 'on'
+                });
+
+                // Initialize terminal
+                const term = new Terminal({
+                    cursorBlink: true,
+                    fontSize: 14,
+                    fontFamily: 'Fira Code, monospace',
+                    theme: {
+                        background: '#000000',
+                        foreground: '#ffffff'
+                    }
+                });
+
+                const fitAddon = new FitAddon.FitAddon();
+                term.loadAddon(fitAddon);
+                term.open(document.getElementById('terminal'));
+                term.write('Welcome to Tablet Code Editor Terminal\r\n$ ');
+
+                // Terminal Toggle
+                const terminalBtn = document.getElementById('terminalBtn');
+                const terminalContainer = document.getElementById('terminalContainer');
+                const closeTerminal = document.getElementById('closeTerminal');
+
+                terminalBtn.addEventListener('click', () => {
+                    terminalContainer.classList.toggle('show');
+                    if (terminalContainer.classList.contains('show')) {
+                        setTimeout(() => {
+                            fitAddon.fit();
+                            editor.layout();
+                        }, 0);
+                    } else {
+                        editor.layout();
+                    }
+                });
+
+                closeTerminal.addEventListener('click', () => {
+                    terminalContainer.classList.remove('show');
+                    editor.layout();
+                });
+
+                // Sidebar Toggle for Mobile
+                const menuBtn = document.getElementById('menuBtn');
+                const sidebar = document.getElementById('sidebar');
+
+                menuBtn.addEventListener('click', () => {
+                    sidebar.classList.toggle('hidden');
+                });
+
+                // Handle window resize
+                window.addEventListener('resize', () => {
+                    editor.layout();
+                    if (terminalContainer.classList.contains('show')) {
+                        fitAddon.fit();
+                    }
+                });
+
+                // Basic terminal input handling
+                term.onKey(({ key, domEvent }) => {
+                    const printable = !domEvent.altKey && !domEvent.ctrlKey && !domEvent.metaKey;
+
+                    if (domEvent.keyCode === 13) { // Enter
+                        term.write('\r\n$ ');
+                    } else if (domEvent.keyCode === 8) { // Backspace
+                        if (term._core.buffer.x > 2) {
+                            term.write('\b \b');
+                        }
+                    } else if (printable) {
+                        term.write(key);
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
